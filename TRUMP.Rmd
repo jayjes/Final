@@ -1,0 +1,186 @@
+---
+title: "The affection for Trump"
+author: "Weizhi Guo"
+date: "2020/12/16"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tinytex)
+```
+
+
+
+# Estimating the factors that influence voting for Trump among the residence of the US
+
+## Name(s) of Author(s) 
+## Date
+
+
+#Abstract
+
+The main objective of the study is to come up with parameter estimates for the appropriate regression model of factors that the influence the likelihood of one voting for Trump. The data set used has a total of 6067 observations and 18 variables. The variables are a mix of continous and categorical variables. Here we are interested in predicting the popular vote outcome of the 2020 American federal election Singh et al (2017). To do this we are employing a post-stratification technique. In the following sub-sections I will describe the model specifics and the post-stratification calculation.  The data set used for the study is survey responses about individuals' demographic variables, opinion on political ideologies, whether an individual would particiapte in a general election as well employment status and whether an individual would vote for Trump. 
+
+
+```{r}
+
+
+# Loading in the cleaned survey Data
+survey_data <- read.csv("/cloud/project/data/raw data.csv");head(survey_data)
+
+survey_data=na.omit(survey_data)
+
+
+```
+
+
+#Introduction
+ The study uses survey data obtained using the link: https://www.census.gov/programs-surveys/acs to assess the factors their shape the voting pattern in the US presidential elections. The factors are analyzed as the whether they are demographic such as ethnicity, race or age, ideological among other variables. The data analysis process  include exploratory  and inferential analyses. The summary statistics are presented in the first part of the study and this is done using  measures of spread and central tendencies and frequency tabulation through cross tabs. Survey is a good statistical tool in collection of data from people. The data collected from the survey conducted is analyzed using R-studio and findings presented as percentages in tabular forms. The inferential statistics mainly focuses on the use of the ordinal logistic regression model to assess the association between the ACS data set variables.  The data set is considered appropriate for the study since it has the appropriate sample size of over 6067 observations which suffices for obtaining results that may be generalizable to the entire population.  
+
+#Methodology
+## Model Specification
+The variables are a mix of continous and categorical variables. Here we are interested in predicting the popular vote outcome of the 2020 American federal election Singh et al (2017). To do this we are employing a post-stratification technique. In the following sub-sections the model specification is described as well as the post-stratification calculation.  The data set used for the study is survey responses about individuals' demographic variables, opinion on political ideologies, whether an individual would particiapte in a general election as well employment status and whether an individual would vote for Trump.
+The binary logistic regression model will be used  to model the proportion of voters who will vote for Donald Trump. This is a naive model, the age,foreign_born,gender,interest,registration+vote_2016,vote_2020, vote_intention, which is recorded as a numeric variable, to model the probability of voting for Donald Trump. The logistic regression model is appropriate since the study involves estimating the influence of several variables on the voting pattern which take binary outcomes. The interest will be estimating the odds of voters having trump as their preferred candidate.  The general form of the model is represented as;$$ln\left( P \over 1-P \right)$$ where we model the log odds of the event, where p represents the probability of the event.
+$$Z_{i} = ln{\left(P_{i} \over 1-P_{i} \right)} = \beta_{0} + \beta_{1} x_{1} + . . + \beta_{n} x_{n}$$
+
+
+
+Where $y$ represents the proportion of voters who will vote for Donald Trump. Similarly, $\beta_0$ represents the intercept of the model, and is the probability of voting for Donald Trump at age 0. Additionally, $\beta_1$ represents the slope of the model. So, for everyone one unit increase in age, we expect a $\beta_1$ increase in the probability of voting for Donald Trump.  The above equation can be modeled using the glm() by setting the family argument to "binomial". But we are more interested in the probability of the event, than the log odds of the event. The odds of an events presents the relative risk or tendency of the desired outcome occurring given certain measures or values of the independent variables.The log odds of the event, can be converted to probability of event as follows:$$P_{i} = 1 - {\left( 1 \over 1 + e^z_{i}\right)}$$
+```{r,include=FALSE}
+#Exploratory data analysis
+library(epiDisplay)
+```
+
+
+```{r}
+tab1(survey_data$interest, sort.group = "decreasing", cum.percent = TRUE,main = "Some people follow what's  going on in government most of the time, when..")
+
+tab1(survey_data$registration, sort.group = "decreasing", cum.percent = TRUE,main = "Distribution of registration status")
+attach(survey_data)
+
+tab1(survey_data$vote_2016, sort.group = "decreasing", cum.percent = TRUE,main = "Distribution of 2016 voting pattern")
+
+
+
+tab1(survey_data$vote_intention, sort.group = "decreasing", cum.percent = TRUE,main = "Distribution of vote intention")
+
+tab1(survey_data$vote_2020, sort.group = "decreasing", cum.percent = TRUE,main = "Distribution of 2020 voting pattern")
+
+
+tab1(survey_data$ideo5, sort.group = "decreasing", cum.percent = TRUE,main = "In general, how would you describe your own political viewpoint?")
+
+
+tab1(survey_data$employment, sort.group = "decreasing", cum.percent = TRUE,main = "Describe your current employments status")
+
+tab1(survey_data$gender, sort.group = "decreasing", cum.percent = TRUE,main = "Distribution of respondents by gender")
+```
+
+```{r,include=FALSE}
+
+attach(survey_data)
+```
+
+
+```{r,include=FALSE}
+library(pROC)
+```
+
+
+```{r, include = FALSE}
+# Create Training Data
+input_1 <- survey_data[which(survey_data$vote_trump == 1), ]  # all replaced by one
+input_0 <- survey_data[which(survey_data$vote_trump == 0), ]  # all replaced by zero
+set.seed(2349)  # for repeatability of samples
+input_1_training_set <- sample(1:nrow(input_1), 0.7*nrow(input_1))  
+input_0_training_set <- sample(1:nrow(input_0), 0.7*nrow(input_0))  
+
+
+#training. Pick as many 0's as 1's
+training_1 <- input_1[input_1_training_set, ]  
+training_0 <- input_0[input_0_training_set, ]
+trainingData <- rbind(training_1, training_0)  # row bind the 1's and 0's 
+
+# Create Test Data
+test_1 <- input_1[-input_1_training_set, ]
+test_0 <- input_0[-input_0_training_set, ]
+testData<-rbind(test_1, test_0) 
+```
+
+
+```{r}
+
+# Creating the Model
+model <- lm(vote_trump ~ age+gender+ race_ethnicity, data=survey_data);#summary(model)
+
+
+
+predicted <- plogis(predict(model, testData))  # predicted scores
+# or
+predicted <- predict(model, testData, type="response")
+
+pROC_obj=roc(testData$vote_trump, predicted,smoothed = TRUE,
+            # arguments for ci
+            ci=TRUE, ci.alpha=0.9, stratified=FALSE,
+            # arguments for plot
+            plot=TRUE, auc.polygon=TRUE, max.auc.polygon=TRUE, grid=TRUE,
+            print.auc=TRUE, show.thres=TRUE)
+
+sens.ci <- ci.se(pROC_obj)
+plot(sens.ci, type="shape", col="lightblue")
+# Model Results (to Report in Results section)
+# summary(model)
+# OR
+broom::tidy(model)
+
+```
+```{r,include=FALSE}
+m1=exp(model$coefficients)
+
+```
+
+
+```{r}
+
+tibble::tibble(m1)
+
+
+```
+
+
+
+# Results
+In order to estimate the proportion of voters who will vote for Donald Trump, the post-stratification analysis is performed. Here celss are created based on different ages. Using the model described in the previous sub-section, an  estimate of  the proportion of voters in each age bin is obtained. From the findings above most of the people of the united states are not considering to vote for Donald Trump in the 2020 general election. Only 33% of the people that participated in the survey are willing to vote for Donald Trump in 2020 general election. 84% of those who voted for Trump in 2016 are considering to vote for him again in the 2020 general election. Of the sample surveyed the white, males, those of age 65 years and above, republican and those with very conservative ideology consider voting for Donald Trump in 2020 general election.  At least 30 % of the sample in each census region are willing to vote for Trump in the coming election.  8% of the democrats are also considering voting for trump while 88% of the democrats would not be voting for him. The Black race are not considering voting for trump. This is also evident in the youths who are aged 18-29 years; only 22 % of the sample showed interest in voting for Trump. 42 % of those who earn income of above 100k are willing to vote in trump in the 2020 general election whereas those of liberal ideology are not considering voting for trump, only 9% show an interest in him. 
+Even before fitting the model, it was clear from the frequency tabulation that most of the individuals would not vote for trump, up to 61.3%(3720) stated that they were against Trump's bid. From the sample, only 38.7%(2347) of the indicated they would vote for Trump. The results of the model indicated that the age of individuals, intention to vote a was significant in explaining the election outcome.  As the age of an individual increases, the likelihood of that individual voting for trump decreases, this is shown by the negative age coefficient estimate. 
+
+# Discussion
+
+
+The survey intended to establish how favorable is Donald Trump in the US. The survey sample findings show that 21% of the sample population consider Trump to be very favorable while 42% consider him very unfavorable, 6 % haven't heard enough about him. The 21% that consider him very favorable are those with very conservative ideology (63%), those who voted for him in the 2016 general elections, and the republicans.  Those who consider Trump to be very unfavorable are those with liberal ideology, those who voted for Clinton and Jill in the 2016 general elections, the blacks and the Hispanic, the female some whites. 11% of the blacks haven't heard enough about Trump. Generally, Trump is considered unfavorable as can be inferred from the findings.
+
+#Conclusion
+
+The study was carried out with the objective of determining the factors that may influence  the election outcome for Trump in the general election.  using both the descriptive statisitics and the inferantial analysis, the following deduction can be made; Majority  of the people of the united states are not considering voting for Donald Trump in the 2020 general election. Just about 33% of the participants would actually  vote for Donald Trump in 2020 general election. The loyalty for Trump has declined among those who voted for him in 2016 to now 84%  who stated they would still support him in the 2020 general election. The whites, males, those of age 65 years and above, republican and those with very conservative ideology consider voting for Donald Trump in 2020 general election.  At least 30 % of the sample in each census region are willing to vote for Trump in the coming election.   Trump recieves the least support from democrats, with only 8% of them willing to vote fro him. Trump has little favour among the Black race who are not considering supporting his bid. This is also evident among the youths who are aged 18-29 years; only 22 % of the sample showed interest in voting for Trump. 42 % of those who earn income of above 100k are willing to vote in trump in the 2020 general election whereas those of liberal ideology would not vote for trump, only 9% show an interest in him. Even before fitting the model, it was clear from the frequency tabulation that most of the individuals would not vote for trump, up to 61.3%(3720) stated that they were against Trump's bid. From the sample, only 38.7%(2347) of the indicated they would vote for Trump. The results of the model indicated that the age of individuals, intention to vote a was significant in explaining the election outcome.  As the age of an individual increases, the likelihood of that individual voting for trump decreases, this is shown by the negative age coefficient estimate. 
+ 
+
+
+
+## Weaknesses
+in the process of conducting the analysis, it was noted that the analysis was highly impacted by presence of inconsistent observations such as missing values. A significant effort was undertaken trying to format the data in  a manner would make it workable. Future procedure in data collection should be  more rigorous to limit the chances of errors and inconsistencies in the data. 
+
+
+## Next Steps
+Subsequent works related to the study should consider inclusion of more variables in the model. it would also help using other classification techniques such as the random forest model and the artificial neural network models and compare their performance with the linear regression models.
+
+
+# References
+
+Singh, P., Sawhney, R. S., & Kahlon, K. S. (2017, November). Forecasting the 2016 US presidential elections using sentiment analysis. In Conference on e-Business, e-Services and e-Society (pp. 412-423). Springer, Cham.
+
+Survey data source; https://www.voterstudygroup.org/publication/nationscape-data-set
+Acs census data, IPUMS: https://usa.ipums.org/usa/index.shtml
